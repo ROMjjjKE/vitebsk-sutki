@@ -243,6 +243,7 @@
     var note = (document.querySelector('[name=bNote]') || {}).value || '';
     if (!phone.trim()) { msg.className = 'msg msg--err'; msg.textContent = 'Укажите телефон для связи.'; return; }
     var b = V.addBooking({ id: V.uid(), code: V.code(), userId: u.id, from: sel.from, to: sel.to, nights: sel.n, total: sel.total, guests: guests, name: name, phone: phone, note: note, status: 'active', created: Date.now() });
+    try { notifyLead(b, sel, guests, name, phone, note); } catch (e) {}
     msg.className = 'msg msg--ok';
     msg.innerHTML = 'Готово. Бронь <b>' + b.code + '</b> на ' + sel.n + ' ноч., сумма ' + V.money(sel.total) + ' — подтвердите у хозяина: ' +
       '<a href="https://wa.me/375290000000?text=' + encodeURIComponent('Бронь ' + b.code + ': ' + sel.from + ' — ' + sel.to + ', гостей ' + guests + ', ' + b.name + ', ' + phone) + '" target="_blank" rel="noopener" style="text-decoration:underline">WhatsApp</a> · <a href="kabinet.html" style="text-decoration:underline">мои брони</a>';
@@ -289,3 +290,33 @@
   }
   draw();
 })();
+  function notifyLead(b, sel, guests, name, phone, note) {
+    var cfg = window.VS_NOTIFY || {};
+    var text = 'Новая бронь ' + b.code + '\n' + sel.from + ' — ' + sel.to + ' (' + sel.n + ' ноч.)' +
+      '\nСумма: ' + V.money(sel.total) + '\nГостей: ' + guests +
+      '\nИмя: ' + name + '\nТелефон: ' + phone + (note ? '\nКомментарий: ' + note : '');
+    if (cfg.tgToken && cfg.tgChat) {
+      try {
+        fetch('https://api.telegram.org/bot' + cfg.tgToken + '/sendMessage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: cfg.tgChat, text: text, disable_web_page_preview: true })
+        }).catch(function () {});
+      } catch (e) {}
+    }
+    if (cfg.email) {
+      try {
+        fetch('https://formsubmit.co/ajax/' + encodeURIComponent(cfg.email), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({
+            _subject: 'Бронь ' + b.code + ' с сайта',
+            Код: b.code, Даты: sel.from + ' — ' + sel.to, Ночей: sel.n,
+            Сумма: V.money(sel.total), Гостей: guests, Имя: name, Телефон: phone, Комментарий: note || ''
+          })
+        }).catch(function () {});
+      } catch (e) {}
+    }
+  }
+
+
